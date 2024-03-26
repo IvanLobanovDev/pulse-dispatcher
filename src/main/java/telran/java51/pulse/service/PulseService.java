@@ -1,6 +1,6 @@
 package telran.java51.pulse.service;
 
-import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cloud.stream.function.StreamBridge;
@@ -13,31 +13,45 @@ import telran.java51.pulse.dto.PulseDTO;
 @Configuration
 @RequiredArgsConstructor
 public class PulseService {
-	
+
 	final StreamBridge streamBridge;
+
 	@Value("${minPulse}")
 	int minPulse;
 	@Value("${maxPulse}")
 	int maxPulse;
-	
+
 	@Bean
-	Consumer<PulseDTO> dispatchData(){
+	Function<PulseDTO, PulseDTO> dispatchMinPulse() {
 		return data -> {
-			if(data.getPayload() < minPulse) {
-				streamBridge.send("lowPulse-out-0", data);
-				return;
+			if (data.getPayload() < minPulse) {
+				return data;
 			}
-			if(data.getPayload() > maxPulse) {
-				streamBridge.send("highPulse-out-0", data);
-				return;
+			if (data.getPayload() > maxPulse) {
+//				return dispatchMaxPulse().apply(data);
+				return null;
 			}
 			long delay = System.currentTimeMillis() - data.getTimestamp();
 			System.out.println("delay: " + delay + ", id: " + data.getId() + ", pulse: " + data.getPayload());
+			return null;
 		};
 	}
+	
+	@Bean
+	Function<PulseDTO, PulseDTO> dispatchMaxPulse() {
+		return data -> {
+			if (data.getPayload() > maxPulse) {
+				return data;
+			}
+			if (data.getPayload() < minPulse) {
+//				return dispatchMinPulse().apply(data);
+				return null;		
+			}
+			long delay = System.currentTimeMillis() - data.getTimestamp();
+			System.out.println("delay: " + delay + ", id: " + data.getId() + ", pulse: " + data.getPayload());
+			return null;
+		};
+	} 
 
 }
 
-//В Dispatcher дописать application properties, чтобы отправлял в разные partition
-//Настроить @Value, чтобы он брал данные из applicationProperties
-//Настроить интерфейс Функция (сделать 2), который будет сортировать и отправлять или данные или Null
